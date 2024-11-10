@@ -148,22 +148,22 @@ def updateResults():
         ping_cache_until = datetime.datetime.now() + datetime.timedelta(
             seconds=ping_cache_seconds)
 
-    # if datetime.datetime.now() > speedtest_cache_until:
-    #     logging.info("Starting SpeedTest...")
-    #     r_server, r_jitter, r_ping, r_download, r_upload, r_status = runSpeedTest()
-    #     server.set(r_server)
-    #     jitter.set(r_jitter)
-    #     speedtest_ping.set(r_ping)
-    #     download_speed.set(r_download)
-    #     upload_speed.set(r_upload)
-    #     speedtest_up.set(r_status)
-    #     logging.info("Server=" + str(r_server) + " Jitter=" + str(r_jitter) +
-    #                  "ms" + " Ping=" + str(r_ping) + "ms" + " Download=" +
-    #                  bits_to_megabits(r_download) + " Upload=" +
-    #                  bits_to_megabits(r_upload))
+    if datetime.datetime.now() > speedtest_cache_until:
+        logging.info("Starting SpeedTest...")
+        r_server, r_jitter, r_ping, r_download, r_upload, r_status = runSpeedTest()
+        server.set(r_server)
+        jitter.set(r_jitter)
+        speedtest_ping.set(r_ping)
+        download_speed.set(r_download)
+        upload_speed.set(r_upload)
+        speedtest_up.set(r_status)
+        logging.info("Server=" + str(r_server) + " Jitter=" + str(r_jitter) +
+                     "ms" + " Ping=" + str(r_ping) + "ms" + " Download=" +
+                     bits_to_megabits(r_download) + " Upload=" +
+                     bits_to_megabits(r_upload))
 
-    #     speedtest_cache_until = datetime.datetime.now() + datetime.timedelta(
-    #         seconds=speedtest_cache_seconds)
+        speedtest_cache_until = datetime.datetime.now() + datetime.timedelta(
+            seconds=speedtest_cache_seconds)
 
     return make_wsgi_app()
 
