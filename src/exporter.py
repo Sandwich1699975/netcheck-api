@@ -7,6 +7,9 @@ from prometheus_client import make_wsgi_app, Gauge
 from flask import Flask
 from waitress import serve
 from shutil import which
+from pythonping import ping, executor
+import ctypes
+
 
 app = Flask("Speedtest-Exporter")  # Create flask app
 
@@ -24,17 +27,28 @@ log.disabled = True
 server = Gauge('speedtest_server_id', 'Speedtest server ID used to test')
 jitter = Gauge('speedtest_jitter_latency_milliseconds',
                'Speedtest current Jitter in ms')
-ping = Gauge('speedtest_ping_latency_milliseconds',
-             'Speedtest current Ping in ms')
+speedtest_ping = Gauge('speedtest_ping_latency_milliseconds',
+                       'Speedtest current Ping in ms')
+custom_ping = Gauge('custom_ping_latency_milliseconds',
+                    'Current ping in ms from custom server')
+custom_packet_loss = Gauge('custom_packet_loss',
+                           'Custom server packet loss')
 download_speed = Gauge('speedtest_download_bits_per_second',
                        'Speedtest current Download Speed in bit/s')
 upload_speed = Gauge('speedtest_upload_bits_per_second',
                      'Speedtest current Upload speed in bits/s')
-up = Gauge('speedtest_up', 'Speedtest status whether the scrape worked')
+speedtest_up = Gauge(
+    'speedtest_up', 'Speedtest status whether the scrape worked')
+ping_up = Gauge(
+    'ping_up', 'Status whether the custom ping worked')
+
 
 # Cache metrics for how long (seconds)?
-cache_seconds = int(os.environ.get('SPEEDTEST_CACHE_FOR', 0))
-cache_until = datetime.datetime.fromtimestamp(0)
+# Speedtests are rate limited. Do not run more than one per hour per IP address
+speedtest_cache_seconds = int(os.environ.get('SPEEDTEST_CACHE_FOR', 3600))
+ping_cache_seconds = int(os.environ.get('PING_CACHE_FOR', 15))
+speedtest_cache_until = datetime.datetime.fromtimestamp(0)
+ping_cache_until = datetime.datetime.fromtimestamp(0)
 
 
 def bytes_to_bits(bytes_per_sec):
@@ -54,7 +68,25 @@ def is_json(myjson):
     return True
 
 
-def runTest():
+def runPing():
+    # Ping google as default
+    DEFAULT_ADDRESS = '8.8.8.8'
+    PING_ADDRESS = os.environ.get('PING_ADDRESS', DEFAULT_ADDRESS)
+
+    try:
+        PING_RESPONSE = ping(PING_ADDRESS, verbose=False)
+    except Exception as E:
+        logging.error("No wifi or invalid permissions: " + E)
+        return (0, -1, -1)
+
+    return (
+        PING_RESPONSE.success(executor.SuccessOn.Most),
+        PING_RESPONSE.rtt_avg_ms,
+        PING_RESPONSE.packet_loss
+    )
+
+
+def runSpeedTest():
     serverID = os.environ.get('SPEEDTEST_SERVER')
     timeout = int(os.environ.get('SPEEDTEST_TIMEOUT', 90))
 
@@ -100,30 +132,47 @@ def runTest():
 
 @app.route("/metrics")
 def updateResults():
-    global cache_until
+    global speedtest_cache_until
+    global ping_cache_until
 
-    if datetime.datetime.now() > cache_until:
-        r_server, r_jitter, r_ping, r_download, r_upload, r_status = runTest()
-        server.set(r_server)
-        jitter.set(r_jitter)
-        ping.set(r_ping)
-        download_speed.set(r_download)
-        upload_speed.set(r_upload)
-        up.set(r_status)
-        logging.info("Server=" + str(r_server) + " Jitter=" + str(r_jitter) +
-                     "ms" + " Ping=" + str(r_ping) + "ms" + " Download=" +
-                     bits_to_megabits(r_download) + " Upload=" +
-                     bits_to_megabits(r_upload))
+    if datetime.datetime.now() > ping_cache_until:
+        logging.info("Starting ping...")
+        r_status, r_ping, r_packet_loss = runPing()
+        ping_up.set(r_status)
+        custom_ping.set(r_ping)
+        custom_packet_loss.set(r_packet_loss)
 
-        cache_until = datetime.datetime.now() + datetime.timedelta(
-            seconds=cache_seconds)
+        logging.info("Status=" + str(r_status) + " Ping=" +
+                     str(r_ping) + " Packet Loss% =" + str(r_packet_loss))
+
+        ping_cache_until = datetime.datetime.now() + datetime.timedelta(
+            seconds=ping_cache_seconds)
+
+    # if datetime.datetime.now() > speedtest_cache_until:
+    #     logging.info("Starting SpeedTest...")
+    #     r_server, r_jitter, r_ping, r_download, r_upload, r_status = runSpeedTest()
+    #     server.set(r_server)
+    #     jitter.set(r_jitter)
+    #     speedtest_ping.set(r_ping)
+    #     download_speed.set(r_download)
+    #     upload_speed.set(r_upload)
+    #     speedtest_up.set(r_status)
+    #     logging.info("Server=" + str(r_server) + " Jitter=" + str(r_jitter) +
+    #                  "ms" + " Ping=" + str(r_ping) + "ms" + " Download=" +
+    #                  bits_to_megabits(r_download) + " Upload=" +
+    #                  bits_to_megabits(r_upload))
+
+    #     speedtest_cache_until = datetime.datetime.now() + datetime.timedelta(
+    #         seconds=speedtest_cache_seconds)
 
     return make_wsgi_app()
 
 
 @app.route("/")
 def mainPage():
-    return ("<h1>Welcome to Speedtest-Exporter.</h1>" +
+    return ("<h1>Welcome to NetCheck API exporter.</h1>" +
+            "Forked from <a href='https://github.com/MiguelNdeCarvalho/speedtest-exporter'>MiguelNdeCarvalho/speedtest-exporter</a>" +
+            "<br>" +
             "Click <a href='/metrics'>here</a> to see metrics.")
 
 
@@ -142,7 +191,22 @@ def checkForBinary():
         exit(1)
 
 
+def checkAdmin():
+    """Aborts the program if it is not run with elevated privalges
+    """
+    isAdmin = False
+    try:
+        isAdmin = os.getuid() == 0
+    except AttributeError:
+        isAdmin = ctypes.windll.shell32.IsUserAnAdmin() != 0
+
+    if not isAdmin:
+        logging.error("You must run this exporter as admin.")
+        exit(1)
+
+
 if __name__ == '__main__':
+    checkAdmin()
     checkForBinary()
     PORT = os.getenv('SPEEDTEST_PORT', 9798)
     logging.info("Starting Speedtest-Exporter on http://localhost:" +
