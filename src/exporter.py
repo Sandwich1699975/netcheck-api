@@ -11,7 +11,7 @@ from pythonping import ping, executor
 import ctypes
 
 
-app = Flask("Speedtest-Exporter")  # Create flask app
+app = Flask("Netcheck-Exporter")  # Create flask app
 
 # Setup logging values
 format_string = 'level=%(levelname)s datetime=%(asctime)s %(message)s'
@@ -42,7 +42,7 @@ custom_packet_loss = Gauge('custom_packet_loss',
 # Cache metrics for how long (seconds)?
 # Speedtests are rate limited. Do not run more than one per hour per IP address
 speedtest_cache_seconds = int(os.environ.get('SPEEDTEST_CACHE_FOR', 3600))
-ping_cache_seconds = int(os.environ.get('PING_CACHE_FOR', 300))
+ping_cache_seconds = int(os.environ.get('PING_CACHE_FOR', 15))
 speedtest_cache_until = datetime.datetime.fromtimestamp(0)
 ping_cache_until = datetime.datetime.fromtimestamp(0)
 
@@ -148,8 +148,7 @@ def updateResults():
         download_speed.set(r_download)
         upload_speed.set(r_upload)
         speedtest_up.set(r_status)
-        logging.info("Server=" + str(r_server) +
-                     "ms" + "ms" + " Download=" +
+        logging.info("Server=" + str(r_server) + " Download=" +
                      bits_to_megabits(r_download) + " Upload=" +
                      bits_to_megabits(r_upload))
 
