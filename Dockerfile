@@ -3,7 +3,7 @@ FROM python:3.11.0-alpine3.15
 # Speedtest CLI Version
 ARG SPEEDTEST_VERSION=1.2.0
 
-# Create user
+# Create user for speedtest CLI only
 RUN adduser -D speedtest
 
 WORKDIR /app
@@ -19,12 +19,12 @@ RUN pip install --no-cache-dir -r requirements.txt && \
     cp /tmp/speedtest /usr/local/bin && \
     chown -R speedtest:speedtest /app && \
     rm -rf \
-     /tmp/* \
-     /app/requirements
+    /tmp/* \
+    /app/requirements
 
 COPY src/. .
 
-USER speedtest
+# Use root user to spawn ping packets 
 
 CMD ["python", "-u", "exporter.py"]
 
