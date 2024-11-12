@@ -42,7 +42,7 @@ custom_packet_loss = Gauge('custom_packet_loss',
 # Cache metrics for how long (seconds)?
 # Speedtests are rate limited. Do not run more than one per hour per IP address
 speedtest_cache_seconds = int(os.environ.get('SPEEDTEST_CACHE_FOR', 3600))
-ping_cache_seconds = int(os.environ.get('PING_CACHE_FOR', 5))
+ping_cache_seconds = int(os.environ.get('PING_CACHE_FOR', 15))
 speedtest_cache_until = datetime.datetime.fromtimestamp(0)
 ping_cache_until = datetime.datetime.fromtimestamp(0)
 
