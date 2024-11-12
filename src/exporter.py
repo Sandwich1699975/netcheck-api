@@ -11,7 +11,7 @@ from pythonping import ping, executor
 import ctypes
 
 
-app = Flask("Speedtest-Exporter")  # Create flask app
+app = Flask("Netcheck-Exporter")  # Create flask app
 
 # Setup logging values
 format_string = 'level=%(levelname)s datetime=%(asctime)s %(message)s'
@@ -42,7 +42,7 @@ custom_packet_loss = Gauge('custom_packet_loss',
 # Cache metrics for how long (seconds)?
 # Speedtests are rate limited. Do not run more than one per hour per IP address
 speedtest_cache_seconds = int(os.environ.get('SPEEDTEST_CACHE_FOR', 3600))
-ping_cache_seconds = int(os.environ.get('PING_CACHE_FOR', 300))
+ping_cache_seconds = int(os.environ.get('PING_CACHE_FOR', 5))
 speedtest_cache_until = datetime.datetime.fromtimestamp(0)
 ping_cache_until = datetime.datetime.fromtimestamp(0)
 
@@ -100,11 +100,11 @@ def runSpeedTest():
             if len(output) > 0:
                 logging.error('Speedtest CLI Error occurred that' +
                               'was not in JSON format')
-            return (0, 0, 0, 0, 0, 0)
+            return (0, 0, 0, 0)
     except subprocess.TimeoutExpired:
         logging.error('Speedtest CLI process took too long to complete ' +
                       'and was killed.')
-        return (0, 0, 0, 0, 0, 0)
+        return (0, 0, 0, 0)
 
     if is_json(output):
         data = json.loads(output)
@@ -112,7 +112,7 @@ def runSpeedTest():
             # Socket error
             print('Something went wrong')
             print(data['error'])
-            return (0, 0, 0, 0, 0, 0)  # Return all data as 0
+            return (0, 0, 0, 0)  # Return all data as 0
         if "type" in data:
             if data['type'] == 'log':
                 print(str(data["timestamp"]) + " - " + str(data["message"]))
@@ -131,6 +131,7 @@ def updateResults():
     if datetime.datetime.now() > ping_cache_until:
         logging.info("Starting ping...")
         r_status, r_ping, r_packet_loss = runPing()
+        print(r_status, r_ping, r_packet_loss)
         ping_up.set(r_status)
         custom_ping.set(r_ping)
         custom_packet_loss.set(r_packet_loss)
@@ -140,21 +141,32 @@ def updateResults():
 
         ping_cache_until = datetime.datetime.now() + datetime.timedelta(
             seconds=ping_cache_seconds)
+    else:
+        logging.info("Request for ping too quick. Returning NaN")
+        ping_up.set(float('nan'))
+        custom_ping.set(float('nan'))
+        custom_packet_loss.set(float('nan'))
 
     if datetime.datetime.now() > speedtest_cache_until:
         logging.info("Starting SpeedTest...")
-        r_server, r_download, r_upload, r_status = runSpeedTest()
+        r_server, r_download, r_upload, r_status = (
+            123, 123, 123, 1)  # runSpeedTest()
         server.set(r_server)
         download_speed.set(r_download)
         upload_speed.set(r_upload)
         speedtest_up.set(r_status)
-        logging.info("Server=" + str(r_server) +
-                     "ms" + "ms" + " Download=" +
+        logging.info("Server=" + str(r_server) + " Download=" +
                      bits_to_megabits(r_download) + " Upload=" +
                      bits_to_megabits(r_upload))
 
         speedtest_cache_until = datetime.datetime.now() + datetime.timedelta(
             seconds=speedtest_cache_seconds)
+    else:
+        logging.info("Request for speedtest too quick. Returning NaN")
+        server.set(float('nan'))
+        download_speed.set(float('nan'))
+        upload_speed.set(float('nan'))
+        speedtest_up.set(float('nan'))
 
     return make_wsgi_app()
 
@@ -200,6 +212,6 @@ if __name__ == '__main__':
     checkAdmin()
     checkForBinary()
     PORT = os.getenv('SPEEDTEST_PORT', 9798)
-    logging.info("Starting Speedtest-Exporter on http://localhost:" +
+    logging.info("Starting Netcheck-Exporter on http://localhost:" +
                  str(PORT))
     serve(app, host='0.0.0.0', port=PORT)
