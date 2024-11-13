@@ -4,12 +4,12 @@ import os
 import logging
 import datetime
 from prometheus_client import make_wsgi_app, Gauge
-from flask import Flask
+from flask import Flask, request
 from waitress import serve
 from shutil import which
 from pythonping import ping, executor
+import signal
 import ctypes
-
 
 app = Flask("Netcheck-Exporter")  # Create flask app
 
@@ -24,19 +24,37 @@ log = logging.getLogger('waitress')
 log.disabled = True
 
 # Create Metrics
-server = Gauge('speedtest_server_id', 'Speedtest server ID used to test')
-download_speed = Gauge('speedtest_download_bits_per_second',
-                       'Speedtest current Download Speed in bit/s')
-upload_speed = Gauge('speedtest_upload_bits_per_second',
-                     'Speedtest current Upload speed in bits/s')
+server = Gauge(
+    'speedtest_server_id',
+    'Speedtest server ID used to test',
+)
+download_speed = Gauge(
+    'speedtest_download_bits_per_second',
+    'Speedtest current Download Speed in bit/s',
+)
+upload_speed = Gauge(
+    'speedtest_upload_bits_per_second',
+    'Speedtest current Upload speed in bits/s',
+)
 speedtest_up = Gauge(
-    'speedtest_up', 'Speedtest status whether the scrape worked')
+    'speedtest_up',
+    'Speedtest status whether the scrape worked',
+)
+
 ping_up = Gauge(
-    'ping_up', 'Status whether the custom ping worked')
-custom_ping = Gauge('custom_ping_latency_milliseconds',
-                    'Current ping in ms from custom server')
-custom_packet_loss = Gauge('custom_packet_loss',
-                           'Custom server packet loss')
+    'ping_up',
+    'Status whether the custom ping worked',
+)
+custom_ping = Gauge(
+    'custom_ping_latency_milliseconds',
+    'Current ping in ms from custom server',
+)
+custom_packet_loss = Gauge(
+    'custom_packet_loss',
+    'Custom server packet loss',
+)
+
+STATUS_VALUES = {"DOWN": 0, "UP": 1, "CACHED_DOWN": 10, "CACHED_UP": 11}
 
 
 # Cache metrics for how long (seconds)?
@@ -45,6 +63,32 @@ speedtest_cache_seconds = int(os.environ.get('SPEEDTEST_CACHE_FOR', 3600))
 ping_cache_seconds = int(os.environ.get('PING_CACHE_FOR', 15))
 speedtest_cache_until = datetime.datetime.fromtimestamp(0)
 ping_cache_until = datetime.datetime.fromtimestamp(0)
+
+
+def shutdown_server():
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        logging.error('Not running with the Werkzeug Server')
+    func()
+
+
+@app.get('/shutdown')
+def shutdown():
+    shutdown_server()
+    return 'Server shutting down...'
+
+
+def graceful_exit(signum, frame):
+    logging.info(f"Caught signal: {signum}")
+    logging.info("Performing cleanup...")
+    app.get('/shutdown')
+    logging.info("Cleanup complete. Exiting.")
+    exit(0)
+
+
+# Register signal handlers for SIGTERM and SIGINT
+signal.signal(signal.SIGTERM, graceful_exit)
+signal.signal(signal.SIGINT, graceful_exit)
 
 
 def bytes_to_bits(bytes_per_sec):
@@ -73,6 +117,7 @@ def runPing():
         PING_RESPONSE = ping(PING_ADDRESS, verbose=False)
     except Exception as E:
         logging.error("No wifi or invalid permissions: " + E)
+        # TODO Standardise how you will raise error
         return (0, -1, -1)
 
     return (
@@ -131,7 +176,6 @@ def updateResults():
     if datetime.datetime.now() > ping_cache_until:
         logging.info("Starting ping...")
         r_status, r_ping, r_packet_loss = runPing()
-        print(r_status, r_ping, r_packet_loss)
         ping_up.set(r_status)
         custom_ping.set(r_ping)
         custom_packet_loss.set(r_packet_loss)
@@ -143,14 +187,13 @@ def updateResults():
             seconds=ping_cache_seconds)
     else:
         logging.info("Request for ping too quick. Returning NaN")
-        ping_up.set(float('nan'))
-        custom_ping.set(float('nan'))
-        custom_packet_loss.set(float('nan'))
+        ping_up.set(STATUS_VALUES['CACHED_UP'])
+        custom_ping.set(-1)
+        custom_packet_loss.set(-1)
 
     if datetime.datetime.now() > speedtest_cache_until:
         logging.info("Starting SpeedTest...")
-        r_server, r_download, r_upload, r_status = (
-            123, 123, 123, 1)  # runSpeedTest()
+        r_server, r_download, r_upload, r_status = runSpeedTest()  # (123,123,123,1)
         server.set(r_server)
         download_speed.set(r_download)
         upload_speed.set(r_upload)
@@ -163,10 +206,10 @@ def updateResults():
             seconds=speedtest_cache_seconds)
     else:
         logging.info("Request for speedtest too quick. Returning NaN")
-        server.set(float('nan'))
-        download_speed.set(float('nan'))
-        upload_speed.set(float('nan'))
-        speedtest_up.set(float('nan'))
+        speedtest_up.set(STATUS_VALUES['CACHED_UP'])
+        server.set(-1)
+        download_speed.set(-1)
+        upload_speed.set(-1)
 
     return make_wsgi_app()
 
