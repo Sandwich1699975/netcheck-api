@@ -186,7 +186,7 @@ def updateResults():
         ping_cache_until = datetime.datetime.now() + datetime.timedelta(
             seconds=ping_cache_seconds)
     else:
-        logging.info("Request for ping too quick. Returning NaN")
+        logging.info("Request for ping too quick. Returning cached values")
         ping_up.set(STATUS_VALUES['CACHED_UP'])
         custom_ping.set(-1)
         custom_packet_loss.set(-1)
@@ -205,7 +205,8 @@ def updateResults():
         speedtest_cache_until = datetime.datetime.now() + datetime.timedelta(
             seconds=speedtest_cache_seconds)
     else:
-        logging.info("Request for speedtest too quick. Returning NaN")
+        logging.info(
+            "Request for speedtest too quick. Returning cached values")
         speedtest_up.set(STATUS_VALUES['CACHED_UP'])
         server.set(-1)
         download_speed.set(-1)
