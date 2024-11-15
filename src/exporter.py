@@ -2,6 +2,9 @@ import subprocess
 import json
 import os
 import logging
+import requests
+import threading
+import sys
 import datetime
 from prometheus_client import make_wsgi_app, Gauge
 from flask import Flask, request
@@ -12,6 +15,8 @@ import signal
 import ctypes
 
 app = Flask("Netcheck-Exporter")  # Create flask app
+
+PORT = os.getenv('SPEEDTEST_PORT', 9798)
 
 # Setup logging values
 format_string = 'level=%(levelname)s datetime=%(asctime)s %(message)s'
@@ -66,13 +71,14 @@ ping_cache_until = datetime.datetime.fromtimestamp(0)
 
 
 def shutdown_server():
-    func = request.environ.get('werkzeug.server.shutdown')
-    if func is None:
+    FUNC = request.environ.get('werkzeug.server.shutdown')
+    if FUNC is None:
         logging.error('Not running with the Werkzeug Server')
-    func()
+        return
+    FUNC()
 
 
-@app.get('/shutdown')
+@app.get('/shutdown-werkzeug')
 def shutdown():
     shutdown_server()
     return 'Server shutting down...'
@@ -80,10 +86,18 @@ def shutdown():
 
 def graceful_exit(signum, frame):
     logging.info(f"Caught signal: {signum}")
-    logging.info("Performing cleanup...")
-    app.get('/shutdown')
+    logging.info("Shutting down...")
+
+    # Make the shutdown call in a separate thread with timeout
+    shutdown_thread = threading.Thread(target=lambda: requests.get(
+        f"http://localhost:{PORT}/shutdown-werkzeug", timeout=2))
+    shutdown_thread.daemon = False
+    shutdown_thread.start()
+
+    shutdown_thread.join(timeout=2)
+
     logging.info("Cleanup complete. Exiting.")
-    exit(0)
+    os._exit(0)
 
 
 # Register signal handlers for SIGTERM and SIGINT
@@ -228,14 +242,14 @@ def checkForBinary():
         logging.error("Speedtest CLI binary not found. Please install it by" +
                       " going to the official website.\n" +
                       "https://www.speedtest.net/apps/cli")
-        exit(1)
+        sys.exit(1)
     speedtestVersionDialog = (subprocess.run(['speedtest', '--version'],
                               capture_output=True, text=True))
     if "Speedtest by Ookla" not in speedtestVersionDialog.stdout:
         logging.error("Speedtest CLI that is installed is not the official" +
                       " one. Please install it by going to the official" +
                       " website.\nhttps://www.speedtest.net/apps/cli")
-        exit(1)
+        sys.exit(1)
 
 
 def checkAdmin():
@@ -249,13 +263,12 @@ def checkAdmin():
 
     if not isAdmin:
         logging.error("You must run this exporter as admin.")
-        exit(1)
+        sys.exit(1)
 
 
 if __name__ == '__main__':
     checkAdmin()
     checkForBinary()
-    PORT = os.getenv('SPEEDTEST_PORT', 9798)
     logging.info("Starting Netcheck-Exporter on http://localhost:" +
                  str(PORT))
     serve(app, host='0.0.0.0', port=PORT)
