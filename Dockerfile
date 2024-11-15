@@ -26,6 +26,6 @@ COPY src/. .
 
 # Use root user to spawn ping packets 
 
-CMD ["python", "-u", "exporter.py"]
+CMD ["python", "-u", "main.py"]
 
 HEALTHCHECK --timeout=10s CMD wget --no-verbose --tries=1 --spider http://localhost:${SPEEDTEST_PORT:=9798}/
