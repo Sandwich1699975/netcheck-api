@@ -64,6 +64,8 @@ class MetricSpeedtest(Metric):
             self._run_speed_test()
         else:
             # Dummy values to avoid ratelimiting
+            logging.info(
+                "TEST_MODE environment variable set. Using test values")
             self._download_bits_per_second = 1.23e+8
             self._upload_bits_per_second = 1.23e+8
             self._success = True
