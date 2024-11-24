@@ -9,6 +9,8 @@ RUN adduser -D speedtest
 WORKDIR /app
 COPY src/requirements.txt .
 
+ENV SPEEDTEST_PORT=9798
+
 # Install required modules and Speedtest CLI
 RUN pip install --no-cache-dir -r requirements.txt && \
     ARCHITECTURE=$(uname -m) && \
@@ -28,4 +30,4 @@ COPY src/. .
 
 CMD ["python", "-u", "main.py"]
 
-HEALTHCHECK --timeout=10s CMD wget --no-verbose --tries=1 --spider http://localhost:${SPEEDTEST_PORT:=9798}/
+HEALTHCHECK --timeout=10s CMD wget --no-verbose --tries=1 --spider http://0.0.0.0:${SPEEDTEST_PORT}/ || exit 1
