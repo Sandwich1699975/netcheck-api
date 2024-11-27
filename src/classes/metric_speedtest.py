@@ -22,7 +22,9 @@ class MetricSpeedtest(Metric):
         if self._CUSTOM_SERVER_ID:
             self._CMD_ARGS.append(f"--server-id={self._CUSTOM_SERVER_ID}")
         self._TEST_MODE = TEST_MODE
-
+        if (self._TEST_MODE):
+            logging.info(
+                "Testing mode ACTIVE for speedtest. Using fake values")
         self._actual_server = Metric.Status.UNINITIALISED
         self._success = False
         self._download_bits_per_second = Metric.Status.UNINITIALISED
