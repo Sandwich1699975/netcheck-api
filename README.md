@@ -16,5 +16,8 @@ You can find the forked repo's documentation [here](https://docs.miguelndecarval
 >
 > **This repository is not meant to be standalone**. See [NetCheck](https://github.com/Sandwich1699975/NetCheck) for supporting code.
 
-Simply install dependencies in `src/requirements.txt` and run `sudo python3 src/main.py`. 
+However, the exporter can be manually started if needed:
+- Install dependencies in `src/requirements.txt`
+- Export environment variables for your Grafana Cloud `URL`, `USERNAME` and `API_TOKEN`
+- Run `sudo python3 src/main.py`. 
 
