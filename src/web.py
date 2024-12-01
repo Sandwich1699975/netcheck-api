@@ -35,9 +35,10 @@ def initialise_cache_variables() -> None:
     """
     # Cache metrics for how long (seconds)?
     # Speedtests are rate limited. Do not run more than one per hour per IP address
-    SPEEDTEST_GLOBAL_CACHE_SECONDS = int(
-        os.environ.get('SPEEDTEST_CACHE_FOR', 3600))
-    update_speedtest_delta(SPEEDTEST_GLOBAL_CACHE_SECONDS)
+    global SPEEDTEST_CACHE_LAN_TIME
+    SPEEDTEST_CACHE_LAN_TIME = int(
+        os.environ.get('SPEEDTEST_CACHE_LAN_TIME', 3600))
+    update_speedtest_delta(SPEEDTEST_CACHE_LAN_TIME)
 
     PING_CACHE_SECONDS = int(os.environ.get('PING_CACHE_FOR', 15))
     update_ping_delta(PING_CACHE_SECONDS)
@@ -123,7 +124,8 @@ def get_speedtest_cache_time() -> int:
     LOOK_BACK_TIME_SECONDS = \
         speedtest_cache_delta.total_seconds() + BOUNDARY_TOLERACE_SECONDS
 
-    if (LOOK_BACK_TIME_SECONDS < 60*60):
+    CACHE_WARNING_THRESHOLD = 60*60  # An hour in seconds
+    if (LOOK_BACK_TIME_SECONDS < CACHE_WARNING_THRESHOLD):
         logging.warning(
             f"Duration calculated for speedtest seems very low: {LOOK_BACK_TIME_SECONDS}")
 
@@ -136,7 +138,7 @@ def get_speedtest_cache_time() -> int:
             f"Failed to fetch devices online. Retaining previous wait time of {speedtest_cache_delta.total_seconds()} seconds")
         return -1
 
-    return DEVICES_ONLINE*60*60
+    return DEVICES_ONLINE*SPEEDTEST_CACHE_LAN_TIME
 
 
 def _shutdown_server() -> Optional[int]:
