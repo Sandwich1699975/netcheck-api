@@ -207,6 +207,9 @@ def updateResults() -> None:
         # Query server to see how many devices are online
         OLD_WAIT_DELTA = speedtest_cache_delta
         update_speedtest_delta(get_speedtest_cache_time())
+        if (OLD_WAIT_DELTA != speedtest_cache_delta):
+            logging.info(
+                f"Wait time changed from {OLD_WAIT_DELTA} to {speedtest_cache_delta}")
         # Check condition again after updating value with new difference.
         # Initial boot will run because speedtest_cache_until starts at epoc 0
         speedtest_cache_until += speedtest_cache_delta - OLD_WAIT_DELTA
