@@ -97,7 +97,7 @@ def get_speedtest_cache_time() -> int:
             if RESULT_JSON["status"] == "success":
                 ORIGINS = [x["metric"]["origin_prometheus"]
                            for x in RESULT_JSON["data"]["result"]]
-                logging.info(f"Found devices online: {ORIGINS}")
+                logging.info(f"Devices found online: {ORIGINS}")
                 # If 0 devices are reported online, assume 1
                 return max(len(ORIGINS), 1)
             else:
@@ -113,12 +113,16 @@ def get_speedtest_cache_time() -> int:
     USERNAME = os.environ.get("USERNAME", None)
     API_TOKEN = os.environ.get("API_TOKEN", None)
 
+    env_error = False
     for name, value in (
         ("URL", URL), ("USERNAME", USERNAME), ("API_TOKEN", API_TOKEN)
     ):
         if value is None:
             logging.error(f"Unable to find environment variable: {name}")
-            return -1
+            env_error = True
+
+    if env_error:
+        return -1
 
     BOUNDARY_TOLERACE_SECONDS = 5*60
     LOOK_BACK_TIME_SECONDS = \
@@ -207,14 +211,19 @@ def updateResults() -> None:
     send_cached_speedtest = False
     if datetime.datetime.now() > speedtest_cache_until:
         # Query server to see how many devices are online
-        OLD_WAIT_DELTA = speedtest_cache_delta
-        update_speedtest_delta(get_speedtest_cache_time())
-        if (OLD_WAIT_DELTA != speedtest_cache_delta):
+        OLD_CACHE_DELTA = speedtest_cache_delta
+        NEW_CACHE_TIME = get_speedtest_cache_time()
+        if NEW_CACHE_TIME != -1:
+            update_speedtest_delta(NEW_CACHE_TIME)
+        else:
+            logging.error(
+                f"Could not resolve new cache time. Maintaining previous value: {speedtest_cache_delta.total_seconds()}(s)")
+        if (OLD_CACHE_DELTA != speedtest_cache_delta):
             logging.info(
-                f"Wait time changed from {OLD_WAIT_DELTA} to {speedtest_cache_delta}")
+                f"Wait time changed from {OLD_CACHE_DELTA} to {speedtest_cache_delta}")
         # Check condition again after updating value with new difference.
         # Initial boot will run because speedtest_cache_until starts at epoc 0
-        speedtest_cache_until += speedtest_cache_delta - OLD_WAIT_DELTA
+        speedtest_cache_until += speedtest_cache_delta - OLD_CACHE_DELTA
         if (datetime.datetime.now() > speedtest_cache_until):
             logging.info("Starting SpeedTest...")
             metric_speedtest.refresh()
