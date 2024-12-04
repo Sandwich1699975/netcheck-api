@@ -5,6 +5,8 @@ import logging
 import os
 import flask
 import re
+
+import waitress.adjustments
 import metrics
 import datetime
 import waitress
@@ -18,7 +20,7 @@ from requests.auth import HTTPBasicAuth
 
 
 app = flask.Flask("Netcheck-Exporter")
-PORT = os.getenv('SPEEDTEST_PORT', 9798)
+PORT = os.getenv('SPEEDTEST_PORT', "9798")
 
 
 def initialise_globals() -> None:
@@ -265,7 +267,12 @@ def initialise_signal_handlers():
 
 def run_app() -> None:
     initialise_cache_variables()
+    logging.info("Cache initialised")
     initialise_globals()
-    initialise_signal_handlers()
+    logging.info("Other globals initialised")
+    # Do not initialise signal handlers if in testing environment
+    if os.environ.get("PYTEST_VERSION") is None:
+        initialise_signal_handlers()
+        logging.info("Signal handlers initialised")
     logging.info(f"Starting Netcheck-Exporter on http://localhost:{PORT}")
     waitress.serve(app, host='0.0.0.0', port=PORT)

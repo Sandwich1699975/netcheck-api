@@ -1,5 +1,10 @@
 .git
-License
+LICENSE
 *.md
 Dockerfile
 .github
+.gitignore
+run_tests.sh
+FUNDING.yml
+__pycache__
+.pytest_cache

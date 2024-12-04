@@ -17,6 +17,7 @@ def initialise_logging() -> None:
 
     log = logging.getLogger('waitress')
     log.disabled = True
+    logging.info("Logging started")
 
 
 def checkForBinary() -> None:

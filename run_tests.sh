@@ -2,7 +2,7 @@
 docker build -t netcheck-api-test-runner -f test/Dockerfile .
 if [ $? -eq 0 ]; then
     printf "\Running Docker image\n\n"
-    docker run netcheck-api-test-runner
+    docker run --rm --name netcheck-api-test-runner netcheck-api-test-runner
 else
     echo "Docker build failed. Exiting."
     exit 1
