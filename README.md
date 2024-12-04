@@ -1,4 +1,6 @@
 # Netcheck API
+![Tests](https://github.com/Sandwich1699975/netcheck-api/actions/workflows/tests.yml/badge.svg)
+
 
 Based on [MiguelNdeCarvalho/speedtest-exporter](https://github.com/MiguelNdeCarvalho/speedtest-exporter)
 
