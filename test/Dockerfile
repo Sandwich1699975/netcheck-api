@@ -8,5 +8,6 @@ RUN pip install --no-cache-dir -r test-requirements.txt && \
 
 COPY ./src /app
 COPY ./test /app
+COPY ./pyproject.toml /app
 
-CMD ["pytest", "--color=yes", "-o" ,"log_cli=true:"]
+CMD ["pytest", "--color=yes"]
