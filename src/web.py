@@ -21,6 +21,7 @@ from requests.auth import HTTPBasicAuth
 
 app = flask.Flask("Netcheck-Exporter")
 PORT = os.getenv('SPEEDTEST_PORT', "9798")
+IN_TEST_ENVIRONMENT = os.environ.get("PYTEST_VERSION") is not None
 
 
 def initialise_globals() -> None:
@@ -214,12 +215,13 @@ def updateResults() -> None:
     if datetime.datetime.now() > speedtest_cache_until:
         # Query server to see how many devices are online
         OLD_CACHE_DELTA = speedtest_cache_delta
-        NEW_CACHE_TIME = get_speedtest_cache_time()
-        if NEW_CACHE_TIME != -1:
-            update_speedtest_delta(NEW_CACHE_TIME)
-        else:
-            logging.error(
-                f"Could not resolve new cache time. Maintaining previous value: {speedtest_cache_delta.total_seconds()}(s)")
+        if not IN_TEST_ENVIRONMENT:
+            NEW_CACHE_TIME = get_speedtest_cache_time()
+            if NEW_CACHE_TIME != -1:
+                update_speedtest_delta(NEW_CACHE_TIME)
+            else:
+                logging.error(
+                    f"Could not resolve new cache time. Maintaining previous value: {speedtest_cache_delta.total_seconds()}(s)")
         if (OLD_CACHE_DELTA != speedtest_cache_delta):
             logging.info(
                 f"Wait time changed from {OLD_CACHE_DELTA} to {speedtest_cache_delta}")
@@ -271,7 +273,7 @@ def run_app() -> None:
     initialise_globals()
     logging.info("Other globals initialised")
     # Do not initialise signal handlers if in testing environment
-    if os.environ.get("PYTEST_VERSION") is None:
+    if not IN_TEST_ENVIRONMENT:
         initialise_signal_handlers()
         logging.info("Signal handlers initialised")
     logging.info(f"Starting Netcheck-Exporter on http://localhost:{PORT}")
