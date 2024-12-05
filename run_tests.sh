@@ -21,7 +21,8 @@ if [ "$USE_CONTAINER" = true ]; then
     act
 else
     echo "Running tests with pytest..."
-    pytest
+    echo "Sudo is required to spawn ping packets"
+    sudo pytest --color=yes -v
 fi
 
 # SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
