@@ -14,7 +14,6 @@ def test_port_valid():
 
 @pytest.mark.dependency()
 def test_debug_mode_is_true():
-    os.environ["DEBUG_MODE"] = "true"
     DEBUG_MODE = os.environ.get('DEBUG_MODE')
     assert DEBUG_MODE == 'true', f"DEBUG_MODE is not 'true', it is '{DEBUG_MODE}'"
 
@@ -66,3 +65,29 @@ class TestValidateMetrics:
         metrics_content = TestValidateMetrics.metrics_response
         assert len(metrics_content) > 0
         # Add further parsing and validation as needed
+
+    @pytest.mark.parametrize("metric, pattern", [
+        ("python_gc_objects_collected_total",
+         r'python_gc_objects_collected_total{generation="(\d+)"} (\d+\.?\d*)'),
+        ("python_gc_objects_uncollectable_total",
+         r'python_gc_objects_uncollectable_total{generation="(\d+)"} (\d+\.?\d*)'),
+        ("python_gc_collections_total",
+         r'python_gc_collections_total{generation="(\d+)"} (\d+\.?\d*)'),
+        ("python_info",
+         r'python_info{implementation="(\w+)",major="(\d+)",minor="(\d+)",patchlevel="(\d+)",version="([\d\.]+)"} (\d+)'),
+        ("speedtest_server_id", r'speedtest_server_id (\d+)'),
+        ("speedtest_download_bits_per_second",
+         r'speedtest_download_bits_per_second (\d+\.?\d*e?[\+\-]?\d*)'),
+        ("speedtest_upload_bits_per_second",
+         r'speedtest_upload_bits_per_second (\d+\.?\d*e?[\+\-]?\d*)'),
+        ("speedtest_up", r'speedtest_up (\d+)'),
+        ("ping_up", r'ping_up (\d+)'),
+        ("custom_ping_latency_milliseconds",
+         r'custom_ping_latency_milliseconds (\d+\.?\d*)'),
+        ("custom_packet_loss", r'custom_packet_loss (\d+\.?\d*)'),
+    ])
+    def test_metric_format(self, metric, pattern):
+        """Ensure each metric matches the expected regex pattern."""
+        regex = re.compile(pattern)
+        matches = regex.findall(TestValidateMetrics.metrics_response)
+        assert matches, f"Metric '{metric}' did not match pattern '{pattern}'"
